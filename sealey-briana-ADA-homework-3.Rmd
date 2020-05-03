@@ -325,9 +325,5 @@ l7 <- lm(data = d2, log_hr ~ log_bmf + MeanGroupSize)
 summary(l7)
 ```
 
-###EXTRA CREDIT?
-#NAW
 
-for (i in c(10, ))
-
-plot
+Extra Credit ~ sometimes it's OK to throw in the towel
