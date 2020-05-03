@@ -1,0 +1,344 @@
+---
+title: "sealey-briana-ADA-homework-3"
+author: "Briana Sealey"
+date: "4/27/2020"
+output: html_document
+---
+```{r setup, message = FALSE, warning = FALSE}
+#load packages
+library(ggplot2)
+library(ggthemes)
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(gridExtra)
+library(broom)
+library(infer)
+library(boot)
+```
+
+```{r, message=FALSE}
+#loading data
+f <- "https://raw.githubusercontent.com/difiore/ADA-datasets/master/KamilarAndCooperData.csv"
+d <- read_csv(f, col_names = TRUE)
+
+head(d, 6)
+
+colnames(d)
+
+#Labeling variables
+longevity <- d$MaxLongevity_m
+brain_size <- d$Brain_Size_Species_Mean
+log_longevity <- log(d$MaxLongevity_m)
+log_brain_size <- log(d$Brain_Size_Species_Mean)
+```
+
+
+###CHALLENGE 1
+####C1, PART 1
+```{r, warning=FALSE}
+#Creating linear regression
+(l1 <- lm(longevity~brain_size))
+(l2 <- lm(log_longevity~log_brain_size))
+
+#Sets theme of ggplot graphs
+theme_set(theme_tufte())
+
+#Untransformed
+p1 <- ggplot(data = d, aes(x = brain_size, y = longevity)) + 
+  geom_point(color = "cyan4", alpha = 0.70) + 
+  geom_smooth(method = lm, color = 'cyan3', se = FALSE) +
+  geom_text(x = 300, y = 250, label="y = 1.218x + 248.952", size = 3)
+
+#Log transformed
+p2 <- ggplot(data = d, aes(x = log_brain_size, y = log_longevity)) + 
+  geom_point(color = "coral4", alpha = 0.70) + 
+  geom_smooth(method = lm, color = 'coral3', se = FALSE) +
+  geom_text(x = 5, y = 5, label="y = 0.2341x + 4.8790", size = 3)
+
+grid.arrange(p1, p2, ncol = 2, nrow = 1)
+```
+
+####C1, PART 2
+```{r}
+#Retrieving linear regression information
+summary(l1)
+summary(l2)
+#inverse log of beta coefficient for L2
+exp(0.23415)
+```
+
+For a 1 unit increase in brain size, there is a 1.2180 unit increase in longevity. Because $\beta_{1}$ $\neq$ 0, we can reject $H_0$ (null hypothesis).
+
+For a difference of 1 natural log unit in brain size (2.71828...), there is a 1.263834 fold increase in longevity. Because $\beta_{1}$ $\neq$ 0, we can reject $H_0$ (null hypothesis).
+
+```{r}
+#Calculating confidence intervals
+confint(l1, level = 0.9)
+confint(l2, level = 0.9)
+```
+
+####C1, PART 3
+```{r, warning = FALSE}
+#Calculating confidence intervals of untransformed
+ci1 <- predict(l1, newdata = data.frame(brainsize = brain_size), interval = "confidence", level = 0.95)
+ci1 <- data.frame(ci1)
+ci1 <- cbind(brain_size, ci1)
+names(ci1) <- c("brainsize", "c.fit1", "c.lwr1", "c.upr1")
+
+#Calculating prediction lines of untransformed
+pred1 <- predict(l1, newdata = data.frame(brainsize = brain_size), interval = "prediction", level = 0.95)
+pred1 <- data.frame(pred1)
+pred1 <- cbind(brain_size, pred1)
+names(pred1) <- c("brainsize", "pred.fit1", "pred.lwr1", "pred.upr1")
+
+#Creating plot for untransformed
+p1 <- ggplot(data = d, aes(x = brain_size, y = longevity)) + 
+  geom_point(alpha = 0.70) +
+  geom_smooth(method = lm, color = 'black', se = FALSE) +
+  geom_line(data = ci1, aes(x = brain_size, y = c.lwr1, color = "cyan3")) +
+  geom_line(data = ci1, aes(x = brain_size, y = c.upr1, color = "cyan3")) +
+  geom_line(data = pred1, aes(x = brain_size, y = pred.lwr1, color = "red")) +
+  geom_line(data = pred1, aes(x = brain_size, y = pred.upr1, color = "red")) +
+  scale_colour_hue(name = "Lines", labels = c("Confidence", "Prediction")) +
+  geom_text(x = 300, y = 100, label = "y = 1.218x + 248.952", size = 3)
+
+#Confidence for log-transformed
+ci2 <- predict(l2, newdata = data.frame(log.brainsize = log_brain_size), interval = "confidence", level = 0.95)
+ci2 <- data.frame(ci2)
+ci2 <- cbind(log_brain_size, ci2)
+names(ci2) <- c("log.brainsize", "c.fit2", "c.lwr2", "c.upr2")
+
+#Prediction lines for log-transformed
+pred2 <- predict(l2, newdata = data.frame(log.brainsize = log_brain_size), interval = "prediction", level = 0.95)
+pred2 <- data.frame(pred2)
+pred2 <- cbind(log_brain_size, pred2)
+names(pred2) <- c("log.brainsize", "pred.fit2", "pred.lwr2", "pred.upr2")
+
+#Plot for log-transformed
+p2 <- ggplot(data = d, aes(x = log_brain_size, y = log_longevity)) + 
+  geom_point(alpha = 0.70) +
+  geom_smooth(method = lm, color = 'black', se = FALSE) +
+  geom_line(data = ci2, aes(x = log_brain_size, y = c.lwr2, color = "cyan3")) +
+  geom_line(data = ci2, aes(x = log_brain_size, y = c.upr2, color = "cyan3")) +
+  geom_line(data = pred2, aes(x = log_brain_size, y = pred.lwr2, color = "red")) +
+  geom_line(data = pred2, aes(x = log_brain_size, y = pred.upr2, color = "red")) +
+  scale_colour_hue(name = "Lines", labels = c("Confidence", "Prediction")) +
+  geom_text(x = 5, y = 4.5, label="y = 0.2341x + 4.8790", size = 3)
+
+grid.arrange(p1, p2, ncol = 2, nrow = 1)
+```
+
+
+####C1, PART 4
+```{r}
+#point estimate for untransformed
+pred.single1 <- predict(l1, newdata = data.frame(brain_size = 750), interval = "prediction", level = 0.95)
+pred.single1
+#confidence interval for untransformed
+conf.single1 <- predict(l1, newdata = data.frame(brain_size = 750), interval = "confidence", level = 0.95)
+conf.single1
+#manually plugging point into equation
+manual1 <- 1.218*750 + 248.952
+#taking a look at prediction, confidence & manual estimates all together
+cbind(pred.single1, conf.single1, manual1)
+
+#point estimate for log-transformed
+pred.single2 <- predict(l2, newdata = data.frame(log_brain_size = log(750)), interval = "prediction", level = 0.95)
+pred.single2
+#confidence interval for untransformed
+conf.single2 <- predict(l2, newdata = data.frame(log_brain_size = log(750)), interval = "confidence", level = 0.95)
+conf.single2
+#manually plugging in point
+manual2 <- 0.2341*log(750) + 4.8790
+#taking a look at prediction, confidence & manual estimates all together
+cbind(pred.single2, conf.single2, manual2)
+```
+
+Point estimates look accurate for both models. Lower & upper bounds encapsulate the point estimate for both the prediction & the confidence fit.
+
+####C1, PART 5
+```{r}
+#Checking if l1 fits linear regression conditions
+plot(l1$residuals) #not normal
+qqnorm(l1$residuals) #not normal
+shapiro.test(l1$residuals) #not normal
+
+#Checking if l2 fits linear regression conditions
+plot(l2$residuals)
+qqnorm(l2$residuals)
+shapiro.test(l2$residuals)
+```
+
+L1 model is not normal across residual plots, qqplots & fails the shapiro.test for normality. However, the log-transformed model is normal across residual plots, qqplots & passes the shapiro.test for normality. L2 model satisfies the conditions for using linear regressions to model the relationship between brain size and longevity. 
+
+###CHALLENGE 2
+####C2, PART 1
+```{r}
+#Naming variables
+log_hr <- log(d$HomeRange_km2)
+log_bmf <- log(d$Body_mass_female_mean)
+
+#runs linear regression and reports values
+l3 <- lm(log_hr ~ log_bmf)
+summary(l3)
+```
+
+####C2, PARTS 2, 3 & 4
+```{r}
+# bootstrap1.beta1 <- d2 %>%
+#   specify(log_hr ~ log_bmf) %>%
+#   generate(reps = 1000, type = "bootstrap") %>%
+#   calculate(stat = "correlation")
+# head(bootstrap1.beta1, 10)
+#   
+# visualize(bootstrap1.beta1, bins = 20)
+
+#The above only calculated for beta1, so run a loop to extract beta0 bootstrap estimate
+reps <- 1000
+l4.boot <- data.frame()
+for (i in 1:reps){
+  sample_d <- sample_n(d, size = nrow(d), replace = TRUE)
+  l4 <- lm(data = sample_d, formula = log(HomeRange_km2) ~ log(Body_mass_female_mean))
+  l4.coeffs <- l4$coefficients
+  l4.coeffs.df <- data.frame(rep = i, intercept = l4.coeffs[1], slope = l4.coeffs[2])
+  #print(l4.coeffs.df)
+  l4.boot <- rbind(l4.boot, l4.coeffs.df)
+  }
+
+#Calculate SE & CI's
+alpha <- 0.05
+bootstrap2.summary <- l4.boot %>%
+summarize(
+  beta1.est = mean(slope),
+  beta0.est = mean(intercept),
+  se.beta0 = sd(intercept),
+  se.beta1 = sd(slope),
+  lower.b1 = quantile(slope, alpha/2),
+  upper.b1 = quantile(slope, 1 - alpha / 2),
+  lower.b0 = quantile(intercept, alpha/2),
+  upper.b0 = quantile(intercept, 1 - alpha / 2))
+bootstrap2.summary
+
+#Beta0 histogram
+hist2 <- ggplot(l4.boot, aes(x = intercept)) + geom_histogram(color="black", fill="coral2", bins = 20)
+#Beta1 histogram
+hist1 <- ggplot(l4.boot, aes(x = slope)) + geom_histogram(color="black", fill="cyan2", bins = 20)
+
+grid.arrange(hist1, hist2, ncol = 2, nrow = 1)
+```
+
+####C2, PART 5
+```{r}
+#tidy lm() for a clearer look
+l3.tidy <- tidy(l3)
+l3.tidy$std.error
+cbind(bootstrap2.summary$se.beta0, bootstrap2.summary$se.beta1)
+```
+
+**How do the SEs estimated from the bootstrap sampling distribution compare to those estimated mathematically as part of lm() function?** They're about the same, however the $\beta_0$ & $\beta_1$ bootstrap SE's (SE = 0.6039754 & 0.0781075, respectively) are lower than the lm() calculations ($\beta_0$ SE = 0.673 & $\beta_1$ SE = 0.0849).
+
+####C2, PART 6
+```{r}
+#Confidence interval found in lm()
+ci3 <- confint(l3, level = 0.95)
+ci3
+#beta0 CI's
+cbind(bootstrap2.summary$lower.b0, bootstrap2.summary$upper.b0)
+#beta1 CI's
+cbind(bootstrap2.summary$lower.b1, bootstrap2.summary$upper.b1)
+```
+
+**How do you bootstrap CIs compare to those estimated mathematically as part of the lm() function?** For $\beta_0$, the CI's are roughly the same; the bootstrap CI's are slightly higher than `lm()`. For $\beta_1$, the CI's are also roughly the same; the bootstrap CI's lower bound is slightly higher than the `lm()` calculation, whereas the bootstrap CI's upper bound is slightly lower. 
+
+Overall, for SE & CI's, the bootstrap generates very close estimates as the model does.
+
+###CHALLENGE 3
+####C3, PART 1
+```{r}
+#adding log-transformed variables to new dataframe d2
+d2 <- d
+d2$log_hr <-  log(d$HomeRange_km2)
+d2$log_bmf <- log(d$Body_mass_female_mean)
+d2$log_day <- log(d$DayLength_km)
+#checking that new columns were added
+colnames(d2)
+
+#Creating Function
+boot_lm <- function(d, model, conf.level = 0.95, reps = 1000){
+  l5 <- lm(data = d2, formula = model)
+  l5.CI <- confint(l5, level = conf.level)
+  l5.tidy <-tidy(l5)
+  l5.coeffs <- l5.tidy$estimate
+  l5.sd <- l5.tidy$std.error
+  l5.info <- data.frame(l5.coeffs, l5.sd, l5.CI)
+  names(l5.info) <- c("lm.est", "lm.sd", "lm.CI.lower", "lm.CI.upper")
+  bootresults <- data.frame()
+  for (i in 1:reps){
+  sample_d2 <- sample_n(d2, size = nrow(d2), replace = TRUE)
+  l6 <- lm(data = sample_d2, formula = model)
+  l6.tidy <-tidy(l6)
+  l6.coeffs <- l6.tidy$estimate
+  bootresults <- rbind(bootresults, l6.coeffs)
+  }
+  mean <- summarize_all(
+    bootresults, .funs = mean
+  )
+  names(mean) <- l5.tidy$term
+  sd <- summarize_all(
+    bootresults, .funs = sd
+  )
+  names(sd) <- l5.tidy$term
+  upper <- summarize_all(
+    bootresults, .funs = quantile, 1-(1-conf.level)/2
+  )
+  names(upper) <- l5.tidy$term
+  lower <- summarize_all(
+    bootresults, .funs = quantile, (1-conf.level)/2
+  )
+  names(lower) <- l5.tidy$term
+  #combining all & transposing
+  results <- as.data.frame(t(bind_rows(mean, sd, lower, upper)))
+  names(results) <- c("boot.est", "boot.sd", "boot.CI.lower", "boot.CI.upper")
+  results <- bind_cols(l5.info, results)
+  rownames(results) <- l5.tidy$term
+  return(results)
+}
+
+#log(HomeRange_km2) ~ log(Body_mass_female_mean)
+model <- "log_hr ~ log_bmf"
+boot_lm(d,model)
+#check to see if l4 was replicated in function
+tidy(l4)
+
+#log(DayLength_km) ~ log(Body_mass_female_mean)
+model <- "log_day ~ log_bmf"
+boot_lm(d,model)
+#check
+l6 <- lm(data = d2, log_hr ~ log_bmf + MeanGroupSize)
+summary(l6)
+
+#log(HomeRange_km2) ~ log(Body_mass_female_mean) + MeanGroupSize
+model <- "log_hr ~ log_bmf + MeanGroupSize"
+boot_lm(d,model)
+#check
+l7 <- lm(data = d2, log_hr ~ log_bmf + MeanGroupSize)
+summary(l7)
+```
+
+
+###Extra Credit 
+sometimes it's OK to throw in the towel...
+
+```{r}
+#set model
+model <- "log_hr ~ log_bmf"
+for (i in seq(from = 10, to = 200, by = 10)){
+  bootstrap4 <- boot_lm(d, model, reps = i)
+  y.line <- as.data.frame(t(bootstrap4$boot.est))
+  #ext.p <- ggplot(data = bootstrap4, aes(x = i, y = y.line$V2)) +
+    #geom_point() + #check to see if it's plotting at all
+    #geom_smooth(method = lm) #plot as lines
+}
+
+```
